@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Processed Image Viewer</title>
+    <style>
+      body {
+        font-family: sans-serif;
+        text-align: center;
+        margin-top: 2rem;
+      }
+      img {
+        max-width: 90%;
+        height: auto;
+        border: 1px solid #ccc;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Processed Image</h1>
+    <img id="processedImage" src="" alt="Waiting for image…" />
+
+    <script>
+      // 1) open WebSocket to Channels consumer
+      const socket = new WebSocket(
+        "ws://" + window.location.host + "/ws/image/"
+      );
+
+      socket.onopen = () => {
+        console.log("WebSocket connected");
+        // If you want to send an initial image from the browser, you can:
+        //   const b64 = await fetch(...).then(r=>r.blob()).then(blob=>toBase64(blob));
+        //   socket.send(JSON.stringify({ image: b64 }));
+      };
+
+      socket.onmessage = (e) => {
+        console.log("WebSocket message received:");
+        const payload = JSON.parse(e.data);
+        if (payload.processed_image) {
+          // 2) set the <img> src to the returned base64 data
+          const imgEl = document.getElementById("processedImage");
+          imgEl.src = "data:image/jpeg;base64," + payload.processed_image;
+        }
+      };
+
+      socket.onclose = () => {
+        console.log("WebSocket closed");
+      };
+
+      socket.onerror = (err) => {
+        console.error("WebSocket error:", err);
+      };
+
+      // helper if you ever need it to convert a Blob to base64
+      function toBase64(blob) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result.split(",")[1]);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+    </script>
+  </body>
+</html>
