@@ -28,25 +28,25 @@ async def send_image():
         print("[>] Image sent")
 
         # Wait for response
-        response = await websocket.recv()
-        print("[<] Received response")
+        # response = await websocket.recv()
+        # print("[<] Received response")
 
-        # Parse response and decode image
-        data = json.loads(response)
-        processed_b64 = data.get("processed_image")
+        # # Parse response and decode image
+        # data = json.loads(response)
+        # processed_b64 = data.get("processed_image")
 
-        if processed_b64:
-            # Decode the processed image
-            processed_bytes = base64.b64decode(processed_b64)
-            nparr = np.frombuffer(processed_bytes, np.uint8)
-            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+        # if processed_b64:
+        #     # Decode the processed image
+        #     processed_bytes = base64.b64decode(processed_b64)
+        #     nparr = np.frombuffer(processed_bytes, np.uint8)
+        #     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
 
-            # Show the image
-            cv2.imshow("Processed Image", img)
-            cv2.waitKey(0)
-            cv2.destroyAllWindows()
-        else:
-            print("No image received in response")
+        #     # Show the image
+        #     cv2.imshow("Processed Image", img)
+        #     cv2.waitKey(0)
+        #     cv2.destroyAllWindows()
+        # else:
+        #     print("No image received in response")
 
 if __name__ == "__main__":
     asyncio.run(send_image())

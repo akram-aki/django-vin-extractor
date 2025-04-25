@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <title>Processed Image Viewer</title>
+    <title>Processed Image Viewer & Parked Cars</title>
     <style>
       body {
         font-family: sans-serif;
@@ -13,53 +13,114 @@
         max-width: 90%;
         height: auto;
         border: 1px solid #ccc;
+        display: block;
+        margin: 1rem auto;
+      }
+      #carsContainer {
+        margin-top: 2rem;
+      }
+      #carList {
+        list-style: none;
+        padding: 0;
+      }
+      #carList li {
+        padding: 0.5rem;
+        border-bottom: 1px solid #eee;
       }
     </style>
   </head>
   <body>
-    <h1>Processed Image</h1>
+    <h1>latest Car</h1>
     <img id="processedImage" src="" alt="Waiting for image…" />
 
-    <script>
-      // 1) open WebSocket to Channels consumer
-      const socket = new WebSocket(
-        "ws://" + window.location.host + "/ws/image/"
-      );
+    <!-- New button and container for parked cars -->
+    <div id="carsContainer">
+      <button id="fetchCars">Load Parked Cars</button>
+      <ul id="carList"></ul>
+    </div>
 
-      socket.onopen = () => {
-        console.log("WebSocket connected");
-        // If you want to send an initial image from the browser, you can:
-        //   const b64 = await fetch(...).then(r=>r.blob()).then(blob=>toBase64(blob));
-        //   socket.send(JSON.stringify({ image: b64 }));
+    <!-- Firebase & WebSocket scripts -->
+    <script type="module">
+      // ----- FIREBASE SETUP -----
+      import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
+      import {
+        getFirestore,
+        collection,
+        getDocs,
+        addDoc,
+      } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+
+      // Helper to add a car (not yet wired up to any UI)
+      async function addCar(car) {
+        try {
+          const docRef = await addDoc(collection(db, "cars"), {
+            plateNumber: car,
+          });
+          console.log("New car stored with ID:", docRef.id);
+        } catch (e) {
+          console.error("Error adding car:", e);
+        }
+      }
+
+      // TODO: replace these with your actual Firebase config (this storageBucket matches your project)
+      const firebaseConfig = {
+        apiKey: apiKey,
+        authDomain: authDomain,
+        projectId: projectId,
+        storageBucket: storageBucket,
+        messagingSenderId: messagingSenderId,
+        appId: appId,
       };
 
+      const app = initializeApp(firebaseConfig);
+      const db = getFirestore(app);
+
+      // Fetch and display cars when button is clicked
+      document
+        .getElementById("fetchCars")
+        .addEventListener("click", async () => {
+          const carListEl = document.getElementById("carList");
+          carListEl.innerHTML = "<li>Loading…</li>";
+
+          try {
+            const snapshot = await getDocs(collection(db, "/cars"));
+            console.log(snapshot);
+            carListEl.innerHTML = ""; // clear loading message
+
+            if (snapshot.empty) {
+              carListEl.innerHTML = "<li>No cars parked.</li>";
+            } else {
+              snapshot.docs.forEach((doc, index) => {
+                const data = doc.data();
+                const li = document.createElement("li");
+                const plate = data.plateNumber || "Unnamed car";
+                li.textContent = `car${index + 1}: ${plate}`;
+                carListEl.appendChild(li);
+              });
+            }
+          } catch (err) {
+            console.error("Error fetching cars:", err);
+            carListEl.innerHTML = "<li>Error loading cars.</li>";
+          }
+        });
+
+      // ----- WEBSOCKET FOR PROCESSED IMAGES -----
+      const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+      const socket = new WebSocket(
+        `${protocol}://${window.location.host}/ws/image/`
+      );
+      const imgEl = document.getElementById("processedImage");
+
+      socket.onopen = () => console.log("WebSocket connected");
       socket.onmessage = (e) => {
-        console.log("WebSocket message received:");
-        const payload = JSON.parse(e.data);
-        if (payload.processed_image) {
-          // 2) set the <img> src to the returned base64 data
-          const imgEl = document.getElementById("processedImage");
-          imgEl.src = "data:image/jpeg;base64," + payload.processed_image;
+        const { processed_image, carNum } = JSON.parse(e.data);
+        if (processed_image && carNum) {
+          imgEl.src = "data:image/jpeg;base64," + processed_image;
+          addCar(carNum);
         }
       };
-
-      socket.onclose = () => {
-        console.log("WebSocket closed");
-      };
-
-      socket.onerror = (err) => {
-        console.error("WebSocket error:", err);
-      };
-
-      // helper if you ever need it to convert a Blob to base64
-      function toBase64(blob) {
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve(reader.result.split(",")[1]);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-      }
+      socket.onclose = () => console.log("WebSocket closed");
+      socket.onerror = (err) => console.error("WebSocket error:", err);
     </script>
   </body>
 </html>
